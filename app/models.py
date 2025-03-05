@@ -1,3 +1,4 @@
+from sqlalchemy import Table, Column, Integer, ForeignKey
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -18,6 +19,7 @@ class User(Base):
 
     listings = relationship("Listing", back_populates="owner", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
+    favorites = relationship("Listing", secondary="favorites", backref="favorited_by", cascade="all, delete")
 
 
 class Listing(Base):
@@ -31,6 +33,8 @@ class Listing(Base):
     rooms_count = Column(Integer, nullable=True)
     description = Column(Text, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     owner = relationship("User", back_populates="listings")
     comments = relationship("Comment", back_populates="listing", cascade="all, delete-orphan")
@@ -47,3 +51,10 @@ class Comment(Base):
 
     listing = relationship("Listing", back_populates="comments")
     author = relationship("User", back_populates="comments")
+
+favorites_table = Table(
+    "favorites",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("listing_id", Integer, ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True),
+)

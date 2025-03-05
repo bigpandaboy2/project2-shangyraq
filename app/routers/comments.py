@@ -68,7 +68,33 @@ def update_comment(
     db.refresh(comment)
     return {"message": "Comment updated successfully"}
 
-@router.delete("/{listing_id}/comments/{comment_id}", status_code=200)
+# app/routers/comments.py
+@router.patch("/{listing_id}/comments/{comment_id}")
+def update_comment(
+    listing_id: int,
+    comment_id: int,
+    comment_data: schemas.CommentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    comment = db.query(models.Comment).filter(
+        models.Comment.id == comment_id,
+        models.Comment.listing_id == listing_id
+    ).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    # only author can update
+    if comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this comment")
+
+    comment.content = comment_data.content
+    db.commit()
+    db.refresh(comment)
+    return {"message": "Comment updated successfully"}
+
+
+@router.delete("/{listing_id}/comments/{comment_id}")
 def delete_comment(
     listing_id: int,
     comment_id: int,
@@ -81,9 +107,15 @@ def delete_comment(
     ).first()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.author_id != current_user.id:
+
+    listing = db.query(models.Listing).filter(models.Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if (comment.author_id != current_user.id) and (listing.user_id != current_user.id):
         raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
 
     db.delete(comment)
     db.commit()
     return {"message": "Comment deleted successfully"}
+

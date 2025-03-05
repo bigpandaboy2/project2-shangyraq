@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -6,6 +7,49 @@ from ..database import get_db
 from ..security import get_current_user
 
 router = APIRouter(prefix="/shanyraks", tags=["Listings"])
+
+@router.get("/")
+def list_shanyraks(
+    db: Session = Depends(get_db),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    type: Optional[str] = None,
+    rooms_count: Optional[int] = None,
+    price_from: Optional[int] = None,
+    price_until: Optional[int] = None,
+):
+    query = db.query(models.Listing)
+
+    if type is not None:
+        query = query.filter(models.Listing.type == type)
+    if rooms_count is not None:
+        query = query.filter(models.Listing.rooms_count == rooms_count)
+    if price_from is not None:
+        query = query.filter(models.Listing.price >= price_from)
+    if price_until is not None:
+        query = query.filter(models.Listing.price <= price_until)
+
+    total = query.count()
+
+    query = query.order_by(models.Listing.created_at.desc())
+
+    listings = query.offset(offset).limit(limit).all()
+
+    objects = []
+    for lst in listings:
+        objects.append({
+            "_id": lst.id,
+            "type": lst.type,
+            "price": lst.price,
+            "address": lst.address,
+            "area": lst.area,
+            "rooms_count": lst.rooms_count
+        })
+
+    return {
+        "total": total,
+        "objects": objects
+    }
 
 @router.post("/", status_code=200)
 def create_listing(
